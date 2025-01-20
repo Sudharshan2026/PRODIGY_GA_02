@@ -1,24 +1,32 @@
 import os
-import torch
+import time
+import keras_cv
+from tensorflow import keras
+import matplotlib.pyplot as plt
 from flask import Flask, request, render_template, send_from_directory, send_file
-from diffusers import StableDiffusionPipeline
 
 app = Flask(__name__)
 
-# Load the Stable Diffusion model
-model_id = "CompVis/stable-diffusion-v1-4"
-device = "cuda" if torch.cuda.is_available() else "cpu"
-pipeline = StableDiffusionPipeline.from_pretrained(model_id).to(device)
+# Load the Keras CV model
+model = keras_cv.models.StableDiffusion(img_height=512, img_width=512)
+
+def plot_images(images, save_path):
+    plt.figure(figsize=(20, 20))
+    for i in range(len(images)):
+        ax = plt.subplot(1, len(images), i + 1)
+        plt.imshow(images[i])
+        plt.axis("off")
+    plt.savefig(save_path)
+    plt.close()
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
         prompt = request.form['prompt']
-        with torch.autocast("cuda"):
-            outputs = pipeline(prompt, height=512, width=512)
-        image = outputs.images[0]
+        batch_size = int(request.form.get('batch_size', 1))
+        images = model.text_to_image(prompt, batch_size=batch_size)
         image_path = os.path.join('static', 'generated_image.png')
-        image.save(image_path)
+        plot_images(images, image_path)
         return render_template('index.html', image_path=image_path)
     return render_template('index.html', image_path=None)
 
